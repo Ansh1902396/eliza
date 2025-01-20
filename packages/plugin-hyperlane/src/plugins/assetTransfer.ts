@@ -1,17 +1,28 @@
-import { Action, HandlerCallback, IAgentRuntime, Memory, State } from "@elizaos/core";
-import { setupHyperlaneCore, validateSettings, handleActionError } from './utils';
-import { Contract } from '@ethersproject/contracts';
-import { parseEther } from '@ethersproject/units';
-import { hexlify } from '@ethersproject/bytes';
-import { TokenTransferConfig } from './types';
+import {
+    Action,
+    HandlerCallback,
+    IAgentRuntime,
+    Memory,
+    Plugin,
+    State,
+} from "@elizaos/core";
+import { hexlify } from "@ethersproject/bytes";
+import { Contract } from "@ethersproject/contracts";
+import { parseEther } from "@ethersproject/units";
+import { TokenTransferConfig } from "../types";
+import {
+    handleActionError,
+    setupHyperlaneCore,
+    validateSettings,
+} from "../utils";
 
-export const transferTokens: Action = {
+export const sendAsset: Action = {
     name: "TRANSFER_TOKENS",
     similes: ["SEND_TOKENS", "BRIDGE_TOKENS", "CROSS_CHAIN_TRANSFER"],
     description: "Transfer tokens between chains using Hyperlane",
 
     validate: async (runtime: IAgentRuntime) =>
-        validateSettings(runtime, ['ethereum', 'polygon']),
+        validateSettings(runtime, ["ethereum", "polygon"]),
     //@ts-ignore
     handler: async (
         runtime: IAgentRuntime,
@@ -29,11 +40,16 @@ export const transferTokens: Action = {
 
             const sourceToken = new Contract(
                 options.tokenAddress,
-                ['function transferRemote(string, bytes, uint256)', 'function quoteGasPayment(string)'],
+                [
+                    "function transferRemote(string, bytes, uint256)",
+                    "function quoteGasPayment(string)",
+                ],
                 multiProvider.getSigner(options.sourceChain)
             );
 
-            const gasQuote = await sourceToken.quoteGasPayment(options.destinationChain);
+            const gasQuote = await sourceToken.quoteGasPayment(
+                options.destinationChain
+            );
 
             const tx = await sourceToken.transferRemote(
                 options.destinationChain,
@@ -52,8 +68,8 @@ export const transferTokens: Action = {
                         amount: options.amount,
                         sourceChain: options.sourceChain,
                         destinationChain: options.destinationChain,
-                        recipient: options.recipient
-                    }
+                        recipient: options.recipient,
+                    },
                 });
             }
 
@@ -74,17 +90,23 @@ export const transferTokens: Action = {
                         destinationChain: "polygon",
                         recipient: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
                         amount: "100",
-                        tokenAddress: "0x123..."
-                    }
-                }
+                        tokenAddress: "0x123...",
+                    },
+                },
             },
             {
                 user: "{{agent}}",
                 content: {
                     text: "I'll initiate the token transfer to Polygon.",
-                    action: "TRANSFER_TOKENS"
-                }
-            }
-        ]
-    ]
+                    action: "TRANSFER_TOKENS",
+                },
+            },
+        ],
+    ],
+};
+
+export const assetTransferPlugin: Plugin = {
+    name: "Asset Transfer",
+    description: "Transfer tokens between chains using Hyperlane",
+    actions: [sendAsset],
 };

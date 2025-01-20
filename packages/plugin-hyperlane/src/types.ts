@@ -1,6 +1,6 @@
 // src/actions/hyperlane/types.ts
-import { ChainMap, ChainMetadata } from '@hyperlane-xyz/sdk';
-import { Address, ProtocolType } from '@hyperlane-xyz/utils';
+import { ChainMap, ChainMetadata } from "@hyperlane-xyz/sdk";
+import { Address, ProtocolType } from "@hyperlane-xyz/utils";
 
 export interface HyperlaneBaseConfig {
     sourceChain: string;

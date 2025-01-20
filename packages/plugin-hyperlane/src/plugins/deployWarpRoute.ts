@@ -1,13 +1,25 @@
 import {
+    Action,
+    HandlerCallback,
+    IAgentRuntime,
+    Memory,
+    Plugin,
+    State,
+    elizaLogger,
+} from "@elizaos/core";
+import { Wallet } from "@ethersproject/wallet";
+import {
     HypERC20Deployer,
+    TokenType,
     WarpRouteDeployConfig,
-    TokenType
-} from '@hyperlane-xyz/sdk';
-import { WarpRouteConfig } from '../types';
-import { Action, HandlerCallback, IAgentRuntime, Memory, State, elizaLogger } from "@elizaos/core";
-import { Wallet } from '@ethersproject/wallet';
-import { Address } from '@hyperlane-xyz/utils';
-import { setupHyperlaneCore, validateSettings, handleActionError } from '../utils';
+} from "@hyperlane-xyz/sdk";
+import { Address } from "@hyperlane-xyz/utils";
+import { WarpRouteConfig } from "../types";
+import {
+    handleActionError,
+    setupHyperlaneCore,
+    validateSettings,
+} from "../utils";
 
 export const deployWarpRoute: Action = {
     name: "DEPLOY_WARP_ROUTE",
@@ -15,7 +27,7 @@ export const deployWarpRoute: Action = {
     description: "Deploy a new Warp Route for cross-chain token transfers",
 
     validate: async (runtime: IAgentRuntime) =>
-        validateSettings(runtime, ['ethereum', 'polygon']),
+        validateSettings(runtime, ["ethereum", "polygon"]),
 
     //@ts-ignore
     handler: async (
@@ -34,16 +46,22 @@ export const deployWarpRoute: Action = {
                 options.destinationChain
             );
             //@ts-ignore
-            const wallet = new Wallet(runtime.getSetting("HYPERLANE_PRIVATE_KEY"));
+            const wallet = new Wallet(
+                runtime.getSetting("HYPERLANE_PRIVATE_KEY") || ""
+            );
             const deployConfig: WarpRouteDeployConfig = {
                 [options.sourceChain]: {
-                    type: options.collateralToken ? TokenType.collateralFiat : TokenType.native,
-                    token: options.collateralToken || '',
+                    type: options.collateralToken
+                        ? TokenType.collateralFiat
+                        : TokenType.native,
+                    token: options.collateralToken || "",
                     name: options.tokenName,
                     symbol: options.tokenSymbol,
                     decimals: options.decimals,
                     owner: await wallet.getAddress(),
-                    mailbox: runtime.getSetting(`${options.sourceChain.toUpperCase()}_MAILBOX_ADDRESS`) as Address,
+                    mailbox: runtime.getSetting(
+                        `${options.sourceChain.toUpperCase()}_MAILBOX_ADDRESS`
+                    ) as Address,
                 },
                 [options.destinationChain]: {
                     type: TokenType.synthetic,
@@ -51,8 +69,10 @@ export const deployWarpRoute: Action = {
                     symbol: options.tokenSymbol,
                     decimals: options.decimals,
                     owner: await wallet.getAddress(),
-                    mailbox: runtime.getSetting(`${options.destinationChain.toUpperCase()}_MAILBOX_ADDRESS`) as Address,
-                }
+                    mailbox: runtime.getSetting(
+                        `${options.destinationChain.toUpperCase()}_MAILBOX_ADDRESS`
+                    ) as Address,
+                },
             };
 
             elizaLogger.info("Deploying token contracts and Warp Routes...");
@@ -75,16 +95,18 @@ export const deployWarpRoute: Action = {
                         router: deployedContracts[options.sourceChain].router,
                     },
                     [options.destinationChain]: {
-                        token: deployedContracts[options.destinationChain].router,
-                        router: deployedContracts[options.destinationChain].router,
+                        token: deployedContracts[options.destinationChain]
+                            .router,
+                        router: deployedContracts[options.destinationChain]
+                            .router,
                     },
                 },
                 config: {
                     tokenName: options.tokenName,
                     tokenSymbol: options.tokenSymbol,
                     decimals: options.decimals,
-                    collateralToken: options.collateralToken
-                }
+                    collateralToken: options.collateralToken,
+                },
             };
 
             if (callback) {
@@ -95,7 +117,6 @@ export const deployWarpRoute: Action = {
             }
 
             return true;
-
         } catch (error) {
             return handleActionError(error, "Warp Route deployment", callback);
         }
@@ -113,7 +134,7 @@ export const deployWarpRoute: Action = {
                         tokenName: "My Wrapped Token",
                         tokenSymbol: "MWT",
                         decimals: 18,
-                    }
+                    },
                 },
             },
             {
@@ -127,4 +148,16 @@ export const deployWarpRoute: Action = {
     ],
 };
 
-export default deployWarpRoute;
+export const deployWarpRoutePlugin: Plugin = {
+    name: "deployWarpRoutePlugin",
+    description: "Deploys a new Warp Route for cross-chain token transfers",
+
+    // Register all actions
+    actions: [deployWarpRoute],
+
+    // Register providers
+    providers: [],
+
+    // Register evaluators
+    evaluators: [],
+};
