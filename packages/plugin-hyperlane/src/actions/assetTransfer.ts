@@ -104,9 +104,3 @@ export const sendAsset: Action = {
         ],
     ],
 };
-
-export const assetTransferPlugin: Plugin = {
-    name: "Asset Transfer",
-    description: "Transfer tokens between chains using Hyperlane",
-    actions: [sendAsset],
-};

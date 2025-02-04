@@ -1,19 +1,19 @@
 // src/actions/hyperlane/utils.ts
-import { JsonRpcProvider } from '@ethersproject/providers';
-import { Wallet } from '@ethersproject/wallet';
-import { MultiProvider, HyperlaneCore } from '@hyperlane-xyz/sdk';
 import { IAgentRuntime, elizaLogger } from "@elizaos/core";
-import { Address, ProtocolType } from '@hyperlane-xyz/utils';
-import { chainData } from "../chainMetadata";
-import { ChainConfig, HyperlaneAddresses, HyperlaneContractAddresses } from './types';
-import pino from 'pino';
+import { JsonRpcProvider } from "@ethersproject/providers";
+import { Wallet } from "@ethersproject/wallet";
+import { HyperlaneCore, MultiProvider } from "@hyperlane-xyz/sdk";
+import { Address, ProtocolType } from "@hyperlane-xyz/utils";
+import pino from "pino";
+import { chainData } from "./chainMetadata";
+import { ChainConfig, HyperlaneContractAddresses } from "./types";
 
 // Create logger instance
 export const logger = pino({
-    level: 'info',
+    level: "info",
     transport: {
-        target: 'pino-pretty'
-    }
+        target: "pino-pretty",
+    },
 });
 
 export const REQUIRED_SETTINGS = {
@@ -22,40 +22,49 @@ export const REQUIRED_SETTINGS = {
         `${chain.toUpperCase()}_RPC_URL`,
         `${chain.toUpperCase()}_MAILBOX_ADDRESS`,
         `${chain.toUpperCase()}_VALIDATOR_ANNOUNCE`,
-        `${chain.toUpperCase()}_IGP_ADDRESS`
-    ]
+        `${chain.toUpperCase()}_IGP_ADDRESS`,
+    ],
 };
 
-export async function validateSettings(runtime: IAgentRuntime, chains: string[]): Promise<boolean> {
+export async function validateSettings(
+    runtime: IAgentRuntime,
+    chains: string[]
+): Promise<boolean> {
     const allRequired = [
         ...REQUIRED_SETTINGS.BASE,
-        ...chains.flatMap(chain => REQUIRED_SETTINGS.CHAIN_SPECIFIC(chain))
+        ...chains.flatMap((chain) => REQUIRED_SETTINGS.CHAIN_SPECIFIC(chain)),
     ];
 
-    return allRequired.every(setting => {
+    return allRequired.every((setting) => {
         const exists = !!runtime.getSetting(setting);
         if (!exists) elizaLogger.error(`Missing required setting: ${setting}`);
         return exists;
     });
 }
 
-export function createChainConfig(runtime: IAgentRuntime, chain: string): ChainConfig {
+export function createChainConfig(
+    runtime: IAgentRuntime,
+    chain: string
+): ChainConfig {
     return {
         name: chain,
         //@ts-ignore
         chainId: chainData[chain].chainId,
         domainId: chainData[chain].domainId,
         protocol: ProtocolType.Ethereum,
-        rpcUrls: [{
-            http: runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`) || '',
-            concurrency: 1
-        }],
+        rpcUrls: [
+            {
+                http:
+                    runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`) || "",
+                concurrency: 1,
+            },
+        ],
         blocks: {
             confirmations: 1,
             reorgPeriod: 1,
             estimateBlockTime: 12,
         },
-        transactionOverrides: {}
+        transactionOverrides: {},
     };
 }
 
@@ -66,7 +75,7 @@ export function setupMultiProvider(
 ): MultiProvider {
     const chainMetadata = {
         [sourceChain]: createChainConfig(runtime, sourceChain),
-        [destinationChain]: createChainConfig(runtime, destinationChain)
+        [destinationChain]: createChainConfig(runtime, destinationChain),
     };
 
     const multiProvider = new MultiProvider(chainMetadata);
@@ -88,15 +97,22 @@ export function setupMultiProvider(
     return multiProvider;
 }
 
-export function getChainAddresses(runtime: IAgentRuntime, chains: string[]): HyperlaneContractAddresses {
+export function getChainAddresses(
+    runtime: IAgentRuntime,
+    chains: string[]
+): HyperlaneContractAddresses {
     const addresses: HyperlaneContractAddresses = {};
 
-    chains.forEach(chain => {
+    chains.forEach((chain) => {
         const prefix = chain.toUpperCase();
         addresses[chain] = {
             mailbox: runtime.getSetting(`${prefix}_MAILBOX_ADDRESS`) as Address,
-            validatorAnnounce: runtime.getSetting(`${prefix}_VALIDATOR_ANNOUNCE`) as Address,
-            interchainGasPaymaster: runtime.getSetting(`${prefix}_IGP_ADDRESS`) as Address
+            validatorAnnounce: runtime.getSetting(
+                `${prefix}_VALIDATOR_ANNOUNCE`
+            ) as Address,
+            interchainGasPaymaster: runtime.getSetting(
+                `${prefix}_IGP_ADDRESS`
+            ) as Address,
         };
     });
 
@@ -108,8 +124,15 @@ export function setupHyperlaneCore(
     sourceChain: string,
     destinationChain: string
 ): { multiProvider: MultiProvider; core: HyperlaneCore } {
-    const multiProvider = setupMultiProvider(runtime, sourceChain, destinationChain);
-    const addresses = getChainAddresses(runtime, [sourceChain, destinationChain]);
+    const multiProvider = setupMultiProvider(
+        runtime,
+        sourceChain,
+        destinationChain
+    );
+    const addresses = getChainAddresses(runtime, [
+        sourceChain,
+        destinationChain,
+    ]);
     const core = HyperlaneCore.fromAddressesMap(addresses, multiProvider);
 
     return { multiProvider, core };
@@ -120,7 +143,8 @@ export async function handleActionError(
     action: string,
     callback?: Function
 ): Promise<false> {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
     elizaLogger.error(`${action} failed:`, error);
 
     if (callback) {
