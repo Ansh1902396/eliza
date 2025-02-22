@@ -21,6 +21,7 @@ import { runPreflightChecksForChains } from "../core/utils";
 // import { indentYamlOrJson } from "../utils/files.js";
 import { ContractReceipt } from "ethers";
 import { stubMerkleTreeConfig } from "../core/utils";
+import { assetTransferPromptTemplate } from "../../../templates";
 // import { runTokenSelectionStep } from "../utils/tokens.js";
 
 import {
@@ -247,7 +248,7 @@ export const transferCrossChainAsset: Action = {
             // Compose transfer context
             const transferContext = composeContext({
                 state,
-                template: "", // TODO: Add template
+                template: assetTransferPromptTemplate, // TODO: Add template
             });
             const content = await generateObjectDeprecated({
                 runtime,
@@ -314,12 +315,6 @@ export const transferCrossChainAsset: Action = {
                 user: "{{user1}}",
                 content: {
                     text: "Transfer 100 USDC from Ethereum to Polygon",
-                    options: {
-                        sourceChain: "ethereum",
-                        targetChain: "polygon",
-                        amount: "100",
-                        tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-                    },
                 },
             },
             {

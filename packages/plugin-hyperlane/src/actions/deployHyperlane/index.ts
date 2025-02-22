@@ -12,6 +12,7 @@ import {
 } from "@elizaos/core";
 import { buildArtifact as coreBuildArtifact } from "@hyperlane-xyz/core/buildArtifact.js";
 import { chainMetadata, GithubRegistry } from "@hyperlane-xyz/registry";
+import { deployChainOnHyperlanePromptTemplate } from "../../../templates";
 import {
     buildAgentConfig,
     ChainMap,
@@ -299,7 +300,7 @@ export const setUpAgentOnHyperlane: Action = {
 
             const hyperlaneContext = composeContext({
                 state,
-                template: "", // TODO: Add template
+                template: deployChainOnHyperlanePromptTemplate, // TODO: Add template
             });
             const content = await generateObjectDeprecated({
                 runtime,
@@ -418,26 +419,21 @@ export const setUpAgentOnHyperlane: Action = {
             {
                 user: "{{user1}}",
                 content: {
-                    text: "Send a message from Ethereum to Polygon",
-                    options: {
-                        sourceChain: "ethereum",
-                        targetChain: "polygon",
-                        recipientAddress: "0x1234...",
-                        message: "Hello Cross Chain!",
-                    },
+                    text: "deploy the chain on Hyperlane ",
+
                 },
             },
             {
                 user: "{{agent}}",
                 content: {
-                    text: "I'll send your message across chains.",
-                    action: "SEND_CROSS_CHAIN_MESSAGE",
+                    text: "I'll deploy your chain on Hyperlane and start agents ",
+                    action: "DEPLOY_CHAIN",
                 },
             },
             {
                 user: "{{agent}}",
                 content: {
-                    text: "Successfully sent message across chains. Transaction hash: 0xabcd...",
+                    text: "Successfully deployed chain on Hyperlane , validator and relayer started",
                 },
             },
         ],

@@ -17,6 +17,7 @@ import { privateKeyToSigner } from "../core/utils";
 import { GithubRegistry , chainMetadata } from "@hyperlane-xyz/registry";
 import { MultiProvider } from "@hyperlane-xyz/sdk";
 import { WriteCommandContext } from "../core/context";
+import { deployWarpRoutePromptTemplate } from "../../../templates";
 
 export const deployWarpRoute:  Action = {
     name : "DEPLOY_WARP_ROUTE",
@@ -70,7 +71,7 @@ export const deployWarpRoute:  Action = {
 
                  const hyperlaneContext = composeContext({
                                 state,
-                                template: "", // TODO: Add template
+                                template: deployWarpRoutePromptTemplate, // TODO: Add template
                             });
                             const content = await generateObjectDeprecated({
                                 runtime,
@@ -162,26 +163,20 @@ export const deployWarpRoute:  Action = {
                 {
                     user: "{{user1}}",
                     content: {
-                        text: "Send a message from Ethereum to Polygon",
-                        options: {
-                            sourceChain: "ethereum",
-                            targetChain: "polygon",
-                            recipientAddress: "0x1234...",
-                            message: "Hello Cross Chain!",
-                        },
+                        text: "Deploy a warp route between chain1 and chain2 with token 0xTokenAddress",
                     },
                 },
                 {
                     user: "{{agent}}",
                     content: {
-                        text: "I'll send your message across chains.",
-                        action: "SEND_CROSS_CHAIN_MESSAGE",
+                        text: "I'll deoply the Warp Route for your token between the chains using hyperlane ",
+                        action: "DEPLOY_WARP_ROUTE",
                     },
                 },
                 {
                     user: "{{agent}}",
                     content: {
-                        text: "Successfully sent message across chains. Transaction hash: 0xabcd...",
+                        text: "Successfully deployed Warp Route",
                     },
                 },
             ],

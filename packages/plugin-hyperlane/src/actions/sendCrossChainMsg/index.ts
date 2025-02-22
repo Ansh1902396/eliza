@@ -11,6 +11,7 @@ import {
 } from "@elizaos/core";
 import { evmWalletProvider, initWalletProvider } from "@elizaos/plugin-evm";
 import { GithubRegistry } from "@hyperlane-xyz/registry";
+import { sendCrossChainMessagePromptTemplate } from "../../../templates";
 
 import {
     ChainName,
@@ -176,7 +177,7 @@ export const sendCrossChainMessage: Action = {
             // Compose swap context
             const sendContext = composeContext({
                 state,
-                template: "", // TODO: Add template
+                template: sendCrossChainMessagePromptTemplate, // TODO: Add template
             });
             const content = await generateObjectDeprecated({
                 runtime,
@@ -252,12 +253,7 @@ export const sendCrossChainMessage: Action = {
                 user: "{{user1}}",
                 content: {
                     text: "Send a message from Ethereum to Polygon",
-                    options: {
-                        sourceChain: "ethereum",
-                        targetChain: "polygon",
-                        recipientAddress: "0x1234...",
-                        message: "Hello Cross Chain!",
-                    },
+
                 },
             },
             {
