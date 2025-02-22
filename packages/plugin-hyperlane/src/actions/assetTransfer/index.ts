@@ -6,11 +6,12 @@ import {
     HyperlaneCore,
     HyperlaneRelayer,
     MultiProtocolProvider,
+    MultiProvider,
     ProviderType,
     Token,
     TokenAmount,
     WarpCore,
-    WarpCoreConfig,
+    WarpCoreConfig
 } from "@hyperlane-xyz/sdk";
 import { parseWarpRouteMessage, timeout } from "@hyperlane-xyz/utils";
 
@@ -18,9 +19,25 @@ import { EXPLORER_URL, MINIMUM_TEST_SEND_GAS } from "../core/consts";
 import { WriteCommandContext } from "../core/context";
 import { runPreflightChecksForChains } from "../core/utils";
 // import { indentYamlOrJson } from "../utils/files.js";
-import { stubMerkleTreeConfig } from "../core/utils";
 import { ContractReceipt } from "ethers";
+import { stubMerkleTreeConfig } from "../core/utils";
 // import { runTokenSelectionStep } from "../utils/tokens.js";
+
+import {
+    Action,
+    ActionExample,
+    composeContext,
+    generateObjectDeprecated,
+    HandlerCallback,
+    IAgentRuntime,
+    Memory,
+    ModelClass,
+    State,
+} from "@elizaos/core";
+import { evmWalletProvider, initWalletProvider } from "@elizaos/plugin-evm";
+import { GithubRegistry } from "@hyperlane-xyz/registry";
+import { Account, Chain, Client, Transport } from "viem";
+import { clientToSigner } from "../../utils/ethersAdapter";
 
 export const WarpSendLogs = {
     SUCCESS: "Transfer was self-relayed!",
@@ -193,3 +210,131 @@ async function executeDelivery({
     await core.waitForMessageProcessed(transferTxReceipt, 10000, 60);
     console.log(`Transfer sent to ${destination} chain!`);
 }
+
+export const transferCrossChainAsset: Action = {
+    name: "TRANSFER_CROSS_CHAIN_ASSET",
+    similes: ["TRANSFER_ASSET", "CROSS_CHAIN_TRANSFER", "SEND_TOKEN", "WARP_TRANSFER"],
+    description: "Transfer tokens between any supported chains using Hyperlane Warp",
+    validate: async (
+        runtime: IAgentRuntime,
+        message: Memory,
+        state?: State
+    ): Promise<boolean> => {
+        const res = await evmWalletProvider.get(runtime, message, state);
+
+        if (res) {
+            return Promise.resolve(true);
+        } else {
+            return Promise.reject(false);
+        }
+    },
+    handler: async (
+        runtime: IAgentRuntime,
+        message: Memory,
+        state?: State,
+        options?: {
+            [key: string]: unknown;
+        },
+        callback?: HandlerCallback
+    ) => {
+        try {
+            if (!state) {
+                state = (await runtime.composeState(message)) as State;
+            } else {
+                state = await runtime.updateRecentMessageState(state);
+            }
+
+            // Compose transfer context
+            const transferContext = composeContext({
+                state,
+                template: "", // TODO: Add template
+            });
+            const content = await generateObjectDeprecated({
+                runtime,
+                context: transferContext,
+                modelClass: ModelClass.LARGE,
+            });
+
+            const walletProvider = await initWalletProvider(runtime);
+            const sourceClient = walletProvider.getPublicClient(content.sourceChain) as Client<Transport, Chain, Account>;
+            const targetClient = walletProvider.getPublicClient(content.targetChain) as Client<Transport, Chain, Account>;
+
+            const sourceSigner = clientToSigner(sourceClient);
+            const targetSigner = clientToSigner(targetClient);
+
+            const registry = new GithubRegistry();
+            const chainMetadata = await registry.getMetadata();
+            const multiProvider = new MultiProvider(chainMetadata, {
+                [content.sourceChain]: sourceSigner,
+                [content.targetChain]: targetSigner,
+            });
+
+            const privateKey = runtime.getSetting("EVM_PRIVATE_KEY") as `0x${string}`;
+            if (!privateKey) {
+                throw new Error("EVM_PRIVATE_KEY is missing");
+            }
+
+            const context: WriteCommandContext = {
+                registry: registry,
+                chainMetadata: chainMetadata,
+                multiProvider: multiProvider,
+                skipConfirmation: true,
+                key: privateKey,
+                signerAddress: await sourceSigner.getAddress(),
+                signer: sourceSigner,
+            };
+
+            const transferOptions = {
+                context: context,
+                warpCoreConfig: content.warpCoreConfig,
+                chains: [content.sourceChain, content.targetChain],
+                amount: content.amount,
+                recipient: content.recipient,
+                timeoutSec: content.timeoutSec ?? 60,
+                skipWaitForDelivery: content.skipWaitForDelivery ?? false,
+                selfRelay: content.selfRelay ?? false,
+            };
+
+            await sendTestTransfer({
+                ...transferOptions,
+            });
+
+            return Promise.resolve(true);
+        } catch (error) {
+            console.error("Error in transferCrossChainAsset handler:", error.message);
+            if (callback) {
+                callback({ text: `Error: ${error.message}` });
+            }
+            return Promise.resolve(false);
+        }
+    },
+    examples: [
+        [
+            {
+                user: "{{user1}}",
+                content: {
+                    text: "Transfer 100 USDC from Ethereum to Polygon",
+                    options: {
+                        sourceChain: "ethereum",
+                        targetChain: "polygon",
+                        amount: "100",
+                        tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                    },
+                },
+            },
+            {
+                user: "{{agent}}",
+                content: {
+                    text: "I'll help transfer your tokens across chains.",
+                    action: "TRANSFER_CROSS_CHAIN_ASSET",
+                },
+            },
+            {
+                user: "{{agent}}",
+                content: {
+                    text: "Successfully transferred tokens across chains. Transaction hash: 0xabcd...",
+                },
+            },
+        ],
+    ] as ActionExample[][],
+};
