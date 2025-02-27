@@ -374,7 +374,7 @@ export const setUpAgentOnHyperlane: Action = {
 
             await validator.run();
 
-            const chain_1 = runtime.getSetting("CHAIN_NAME_1");
+            const chain_1 = runtime.getSetting("CHAIN_NAME");
             if (!chain_1) {
                 throw new Error("Chain name not found");
             }
