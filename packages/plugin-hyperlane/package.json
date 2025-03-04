@@ -1,6 +1,6 @@
 {
-    "name": "plugin-hyperlane",
-    "version": "1.0.0",
+    "name": "@elizaos/plugin-hyperlane",
+    "version": "0.1.0-alpha.1",
     "description": "",
     "main": "index.js",
     "scripts": {
