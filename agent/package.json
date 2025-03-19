@@ -53,6 +53,7 @@
         "@elizaos/plugin-story": "workspace:*",
         "@elizaos/plugin-gitcoin-passport": "workspace:*",
         "@elizaos/plugin-goat": "workspace:*",
+        "@elizaos/plugin-hyperlane": "workspace:*",
         "@elizaos/plugin-lensNetwork": "workspace:*",
         "@elizaos/plugin-icp": "workspace:*",
         "@elizaos/plugin-image-generation": "workspace:*",
