@@ -37,6 +37,7 @@ import {
     AGENT_CONFIG_FILE,
     CORE_CONFIG_FILE,
     createConfigFilePath,
+    createAgentConfigFilePath,
 } from "../core/consts";
 import { CommandContext, WriteCommandContext } from "../core/context";
 import {

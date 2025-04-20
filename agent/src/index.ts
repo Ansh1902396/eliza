@@ -14,6 +14,7 @@ import { FarcasterClientInterface } from "@elizaos/client-farcaster";
 // import { ReclaimAdapter } from "@elizaos/plugin-reclaim";
 import { hyperlanePlugin } from "@elizaos/plugin-hyperlane";
 import { PrimusAdapter } from "@elizaos/plugin-primus";
+import { mainCharacter } from "./mainCharacter";
 import {
     AgentRuntime,
     CacheManager,
@@ -335,8 +336,8 @@ export async function loadCharacters(
     }
 
     if (loadedCharacters.length === 0) {
-        elizaLogger.info("No characters found, using default character");
-        loadedCharacters.push(defaultCharacter);
+        elizaLogger.info("No characters found, using main character");
+        loadedCharacters.push(mainCharacter);
     }
 
     return loadedCharacters;
@@ -940,7 +941,9 @@ export async function createAgent(
             getSecret(character, "RESERVOIR_API_KEY")
                 ? createNFTCollectionsPlugin()
                 : null,
-            hyperlanePlugin,
+            getSecret(character, "HYPERLANE_PRIVATE_KEY")
+                ? hyperlanePlugin
+                : null,
         ].filter(Boolean),
         providers: [],
         actions: [],
@@ -1114,7 +1117,7 @@ const startAgents = async () => {
     let serverPort = parseInt(settings.SERVER_PORT || "3000");
     const args = parseArguments();
     let charactersArg = args.characters || args.character;
-    let characters = [defaultCharacter];
+    let characters = [mainCharacter];
 
     if (charactersArg || hasValidRemoteUrls()) {
         characters = await loadCharacters(charactersArg);
