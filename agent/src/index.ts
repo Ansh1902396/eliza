@@ -12,8 +12,8 @@ import { TelegramClientInterface } from "@elizaos/client-telegram";
 import { TwitterClientInterface } from "@elizaos/client-twitter";
 import { FarcasterClientInterface } from "@elizaos/client-farcaster";
 // import { ReclaimAdapter } from "@elizaos/plugin-reclaim";
+import { hyperlanePlugin } from "@elizaos/plugin-hyperlane";
 import { PrimusAdapter } from "@elizaos/plugin-primus";
-
 import {
     AgentRuntime,
     CacheManager,
@@ -940,6 +940,7 @@ export async function createAgent(
             getSecret(character, "RESERVOIR_API_KEY")
                 ? createNFTCollectionsPlugin()
                 : null,
+            hyperlanePlugin,
         ].filter(Boolean),
         providers: [],
         actions: [],
