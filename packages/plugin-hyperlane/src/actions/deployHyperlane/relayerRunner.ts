@@ -1,14 +1,20 @@
 import Docker from "dockerode";
 import path from "path";
 import fs from "fs";
+import pino from "pino";
+
+import { elizaLogger as logger } from "@elizaos/core";
+
 
 const docker = new Docker();
 
 // Utility to create directories if they don't exist
 const createDirectory = (directoryPath: string): void => {
   if (!fs.existsSync(directoryPath)) {
+    logger.info({ path: directoryPath }, `Creating directory: ${directoryPath}`);
     fs.mkdirSync(directoryPath, { recursive: true });
-    console.log(`Created directory: ${directoryPath}`);
+  } else {
+    logger.debug({ path: directoryPath }, `Directory already exists: ${directoryPath}`);
   }
 };
 
@@ -24,9 +30,20 @@ export class RelayerRunner {
   constructor(relayChains: string[], relayerKey: string, configFilePath: string, validatorChainName: string) {
     this.relayChains = relayChains;
     this.relayerKey = relayerKey;
-    this.configFilePath = configFilePath;
-    this.relayerDbPath = path.resolve("hyperlane_db_relayer");
-    this.validatorSignaturesDir = path.resolve(`tmp/hyperlane-validator-signatures-${validatorChainName}`);
+    this.configFilePath = path.resolve(configFilePath);
+    
+    // Use the cache directory structure for consistency
+    const cacheDir = path.join(process.cwd(), 'cache');
+    const relayerDir = path.join(cacheDir, 'relayer');
+    this.relayerDbPath = path.join(relayerDir, 'db');
+    this.validatorSignaturesDir = path.join(cacheDir, validatorChainName, 'validator-signatures');
+
+    logger.info({ 
+      chains: relayChains,
+      configPath: this.configFilePath,
+      dbPath: this.relayerDbPath,
+      signaturesDir: this.validatorSignaturesDir
+    }, `Initializing RelayerRunner for chains: ${relayChains.join(', ')}`);
 
     // Ensure required directories exist
     createDirectory(this.relayerDbPath);
@@ -34,36 +51,47 @@ export class RelayerRunner {
 
   async run(): Promise<void> {
     try {
-      console.log(`Pulling latest Hyperlane agent Docker image...`);
-      await docker.pull("gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0", (err, stream) => {
-        if (err) {
-          console.error("Error pulling Docker image:", err);
-          return;
-        }
-        docker.modem.followProgress(stream, onFinished, onProgress);
-
-        function onFinished(err?: Error) {
+      logger.info(`Pulling latest Hyperlane agent Docker image...`);
+      
+      // Pull the Docker image
+      await new Promise<void>((resolve, reject) => {
+        docker.pull("gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0", (err: Error | null, stream: any) => {
           if (err) {
-            console.error("Error pulling Docker image:", err);
-          } else {
-            console.log("Docker image pulled successfully.");
+            logger.error({ error: err }, "Error pulling Docker image");
+            reject(err);
+            return;
           }
-        }
-
-        function onProgress(event: any) {
-          console.log("Downloading Docker image...", event);
-        }
+          
+          docker.modem.followProgress(stream, 
+            (err: Error | null, output: any[]) => {
+              if (err) {
+                logger.error({ error: err }, "Error pulling Docker image");
+                reject(err);
+              } else {
+                logger.info("Docker image pulled successfully.");
+                resolve();
+              }
+            },
+            (event: any) => {
+              logger.debug(event, "Downloading Docker image...");
+            }
+          );
+        });
       });
 
-      console.log(`Creating container for relayer on chains: ${this.relayChains.join(", ")}...`);
+      logger.info({ chains: this.relayChains }, `Creating container for relayer on chains: ${this.relayChains.join(", ")}...`);
+      
+      // Prepare mount paths for the container
+      const containerConfigPath = "/config/agent-config.json";
+      
       const container = await docker.createContainer({
         Image: "gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0",
-        Env: [`CONFIG_FILES=/config/agent-config.json`],
+        Env: [`CONFIG_FILES=${containerConfigPath}`],
         HostConfig: {
           Mounts: [
             {
-              Source: path.resolve(this.configFilePath),
-              Target: "/config/agent-config.json",
+              Source: this.configFilePath,
+              Target: containerConfigPath,
               Type: "bind",
               ReadOnly: true,
             },
@@ -95,38 +123,50 @@ export class RelayerRunner {
       });
 
       this.containerId = container.id;
+      logger.info({ containerId: this.containerId }, `Created container for relayer on chains: ${this.relayChains.join(", ")}`);
 
-      console.log(`Starting relayer for chains: ${this.relayChains.join(", ")}...`);
+      logger.info({ chains: this.relayChains }, `Starting relayer for chains: ${this.relayChains.join(", ")}...`);
       await container.start();
-      console.log(`Relayer for chains: ${this.relayChains.join(", ")} started successfully.`);
+      logger.info({ chains: this.relayChains }, `Relayer for chains: ${this.relayChains.join(", ")} started successfully.`);
 
-      console.log("Fetching container logs...");
+      logger.debug("Fetching container logs...");
       const logStream = await container.logs({
         follow: true,
         stdout: true,
         stderr: true,
       });
       logStream.on("data", (chunk) => {
-        console.log(chunk.toString());
+        logger.info(`[Relayer ${this.relayChains.join(',')}] ${chunk.toString().trim()}`);
       });
 
-      console.log("Relayer is now running. Monitoring logs...");
+      logger.info({ chains: this.relayChains }, "Relayer is now running. Monitoring logs...");
     } catch (error) {
-      console.error(`Error starting relayer for chains: ${this.relayChains.join(", ")}`, error);
+      logger.error({ chains: this.relayChains, error }, `Error starting relayer for chains: ${this.relayChains.join(", ")}`);
+      throw error;
     }
   }
 
   async checkStatus(): Promise<void> {
     try {
+      logger.info({ chains: this.relayChains }, `Checking status of relayer for chains: ${this.relayChains.join(", ")}`);
       const containers = await docker.listContainers({ all: true });
       const runningContainer = containers.find((c) => c.Id === this.containerId);
+      
       if (runningContainer) {
-        console.log(`Relayer container is running: ${runningContainer.Id}`);
+        logger.info({ 
+          chains: this.relayChains, 
+          containerId: this.containerId,
+          state: runningContainer.State
+        }, `Relayer container is running: ${runningContainer.Id}`);
       } else {
-        console.log("Relayer container is not running.");
+        logger.warn({ 
+          chains: this.relayChains, 
+          containerId: this.containerId 
+        }, "Relayer container is not running.");
       }
     } catch (error) {
-      console.error("Error checking container status:", error);
+      logger.error({ chains: this.relayChains, error }, "Error checking container status");
+      throw error;
     }
   }
 }

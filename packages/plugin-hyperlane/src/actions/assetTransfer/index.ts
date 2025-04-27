@@ -263,7 +263,9 @@ export const transferCrossChainAsset: Action = {
             const sourceSigner = clientToSigner(sourceClient);
             const targetSigner = clientToSigner(targetClient);
 
-            const registry = new GithubRegistry();
+            const registry = new GithubRegistry({
+                authToken : "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",
+            });
             const chainMetadata = await registry.getMetadata();
             const multiProvider = new MultiProvider(chainMetadata, {
                 [content.sourceChain]: sourceSigner,

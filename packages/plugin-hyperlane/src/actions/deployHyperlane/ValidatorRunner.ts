@@ -1,14 +1,21 @@
 import Docker from "dockerode";
 import path from "path";
 import fs from "fs";
+import pino from "pino";
+import { elizaLogger as logger } from "@elizaos/core";
+
+
+
 
 const docker = new Docker();
 
 // Utility to create directories if they don't exist
 const createDirectory = (directoryPath: string): void => {
   if (!fs.existsSync(directoryPath)) {
+    logger.info({ path: directoryPath }, `Creating directory: ${directoryPath}`);
     fs.mkdirSync(directoryPath, { recursive: true });
-    console.log(`Created directory: ${directoryPath}`);
+  } else {
+    logger.debug({ path: directoryPath }, `Directory already exists: ${directoryPath}`);
   }
 };
 
@@ -24,11 +31,19 @@ export class ValidatorRunner {
   constructor(chainName: string, validatorKey: string, configFilePath: string) {
     this.chainName = chainName;
     this.validatorKey = validatorKey;
-    this.configFilePath = configFilePath;
-    this.validatorSignaturesDir = path.resolve(
-      `tmp/hyperlane-validator-signatures-${chainName}`
-    );
-    this.validatorDbPath = path.resolve(`hyperlane_db_validator_${chainName}`);
+    this.configFilePath = path.resolve(configFilePath);
+    
+    // Use the cache directory structure for consistency
+    const cacheDir = path.join(process.cwd(), 'cache', chainName);
+    this.validatorSignaturesDir = path.join(cacheDir, 'validator-signatures');
+    this.validatorDbPath = path.join(cacheDir, 'validator-db');
+
+    logger.info({ 
+      chain: chainName,
+      configPath: this.configFilePath,
+      signaturesDir: this.validatorSignaturesDir,
+      dbPath: this.validatorDbPath
+    }, `Initializing ValidatorRunner for chain: ${chainName}`);
 
     // Ensure required directories exist
     createDirectory(this.validatorSignaturesDir);
@@ -37,36 +52,47 @@ export class ValidatorRunner {
 
   async run(): Promise<void> {
     try {
-      console.log(`Pulling latest Hyperlane agent Docker image...`);
-      await docker.pull("gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0", (err, stream) => {
-        if (err) {
-          console.error("Error pulling Docker image:", err);
-          return;
-        }
-        docker.modem.followProgress(stream, onFinished, onProgress);
-
-        function onFinished(err?: Error) {
+      logger.info(`Pulling latest Hyperlane agent Docker image...`);
+      
+      // Pull the Docker image
+      await new Promise<void>((resolve, reject) => {
+        docker.pull("gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0", (err: Error | null, stream: any) => {
           if (err) {
-            console.error("Error pulling Docker image:", err);
-          } else {
-            console.log("Docker image pulled successfully.");
+            logger.error({ error: err }, "Error pulling Docker image");
+            reject(err);
+            return;
           }
-        }
-
-        function onProgress(event: any) {
-          console.log("Downloading Docker image...", event);
-        }
+          
+          docker.modem.followProgress(stream, 
+            (err: Error | null, output: any[]) => {
+              if (err) {
+                logger.error({ error: err }, "Error pulling Docker image");
+                reject(err);
+              } else {
+                logger.info("Docker image pulled successfully.");
+                resolve();
+              }
+            },
+            (event: any) => {
+              logger.debug(event, "Downloading Docker image...");
+            }
+          );
+        });
       });
 
-      console.log(`Creating container for validator on chain: ${this.chainName}...`);
+      logger.info({ chain: this.chainName }, `Creating container for validator on chain: ${this.chainName}...`);
+      
+      // Prepare mount paths for the container
+      const containerConfigPath = "/configs/agent-config.json";
+      
       const container = await docker.createContainer({
         Image: "gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.1.0",
-        Env: [`CONFIG_FILES=/home/ruddy/Hyperlane-ChainDeployer/hyperlane-deployer/configs/agent-config.json`],
+        Env: [`CONFIG_FILES=${containerConfigPath}`],
         HostConfig: {
           Mounts: [
             {
-              Source: path.resolve(this.configFilePath),
-              Target: "/home/ruddy/Hyperlane-ChainDeployer/hyperlane-deployer/configs/agent-config.json",
+              Source: this.configFilePath,
+              Target: containerConfigPath,
               Type: "bind",
               ReadOnly: true,
             },
@@ -99,38 +125,50 @@ export class ValidatorRunner {
       });
 
       this.containerId = container.id;
+      logger.info({ containerId: this.containerId }, `Created container for validator on chain: ${this.chainName}`);
 
-      console.log(`Starting validator for chain: ${this.chainName}...`);
+      logger.info({ chain: this.chainName }, `Starting validator for chain: ${this.chainName}...`);
       await container.start();
-      console.log(`Validator for chain: ${this.chainName} started successfully.`);
+      logger.info({ chain: this.chainName }, `Validator for chain: ${this.chainName} started successfully.`);
 
-      console.log("Fetching container logs...");
+      logger.debug("Fetching container logs...");
       const logStream = await container.logs({
         follow: true,
         stdout: true,
         stderr: true,
       });
       logStream.on("data", (chunk) => {
-        console.log(chunk.toString());
+        logger.info(`[Validator ${this.chainName}] ${chunk.toString().trim()}`);
       });
 
-      console.log("Validator is now running. Monitoring logs...");
+      logger.info({ chain: this.chainName }, "Validator is now running. Monitoring logs...");
     } catch (error) {
-      console.error(`Error starting validator for chain: ${this.chainName}`, error);
+      logger.error({ chain: this.chainName, error }, `Error starting validator for chain: ${this.chainName}`);
+      throw error;
     }
   }
 
   async checkStatus(): Promise<void> {
     try {
+      logger.info({ chain: this.chainName }, `Checking status of validator for chain: ${this.chainName}`);
       const containers = await docker.listContainers({ all: true });
       const runningContainer = containers.find((c) => c.Id === this.containerId);
+      
       if (runningContainer) {
-        console.log(`Validator container is running: ${runningContainer.Id}`);
+        logger.info({ 
+          chain: this.chainName, 
+          containerId: this.containerId,
+          state: runningContainer.State
+        }, `Validator container is running: ${runningContainer.Id}`);
       } else {
-        console.log("Validator container is not running.");
+        logger.warn({ 
+          chain: this.chainName, 
+          containerId: this.containerId 
+        }, "Validator container is not running.");
       }
     } catch (error) {
-      console.error("Error checking container status:", error);
+      logger.error({ chain: this.chainName, error }, "Error checking container status");
+      throw error;
     }
   }
 }

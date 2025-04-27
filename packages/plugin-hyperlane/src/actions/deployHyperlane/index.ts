@@ -63,7 +63,11 @@ import {
     createMerkleTreeConfig,
 } from "../core/config";
 
-const registry = new GithubRegistry();
+const registry = new GithubRegistry(
+    {
+        authToken : "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",
+    }
+);
 
 //Initialize the chain congig
 export async function createChainConfig({
@@ -309,7 +313,11 @@ export const setUpAgentOnHyperlane: Action = {
                 modelClass: ModelClass.LARGE,
             });
 
-            const registry = new GithubRegistry();
+            const registry = new GithubRegistry(
+                {
+                    authToken : "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",
+                }
+            );
 
             const signerPrivateKey = runtime.getSetting(
                 "HYPERLANE_PRIVATE_KEY"

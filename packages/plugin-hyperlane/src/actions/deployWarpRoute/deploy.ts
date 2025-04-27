@@ -28,13 +28,31 @@
     const apiKeys: ChainMap<string> = {};
 
     for (const chain of chains) {
+      try {
+        // Check if API key is already available in chain metadata
       if (chainMetadata[chain]?.blockExplorers?.[0]?.apiKey) {
+          console.log(`Found API key for ${chain} in chain metadata`);
         apiKeys[chain] = chainMetadata[chain]!.blockExplorers![0]!.apiKey!;
         continue;
       }
 
-        chainMetadata[chain].blockExplorers![0].apiKey = apiKeys[chain];
+        // If no explorer data is available, skip this chain
+        if (!chainMetadata[chain]?.blockExplorers ||
+            chainMetadata[chain]!.blockExplorers!.length === 0) {
+          console.log(`No block explorer found for ${chain}, skipping API key`);
+          continue;
+        }
 
+        // Update the chain metadata with the API key (if found)
+        if (apiKeys[chain]) {
+          console.log(`Setting API key for ${chain}`);
+        chainMetadata[chain].blockExplorers![0].apiKey = apiKeys[chain];
+        } else {
+          console.log(`No API key found for ${chain}, contract verification may not work`);
+        }
+      } catch (error) {
+        console.log(`Error handling API key for ${chain}: ${error.message}`);
+      }
       }
 
     return apiKeys;

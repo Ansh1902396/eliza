@@ -181,16 +181,25 @@ export class AgentRegistry extends BaseRegistry implements IRegistry {
 
 
       private async saveLocalFile() {
-        const dirname = path.dirname(this.localRootDir);
-        await fs.mkdir(dirname, { recursive: true });
+        try {
+          // Make sure the directory exists
+          const dirname = path.dirname(this.localRootDir);
+          this.logger.debug(`Ensuring directory exists: ${dirname}`);
+          await fs.mkdir(dirname, { recursive: true });
 
-        await fs.writeFile(
-            this.localRootDir ,
-            JSON.stringify(this.registryData , null , 2),
-            'utf-8'
-        );
+          // Write the file
+          this.logger.debug(`Writing registry data to: ${this.localRootDir}`);
+          await fs.writeFile(
+              this.localRootDir,
+              JSON.stringify(this.registryData, null, 2),
+              'utf-8'
+          );
 
-        this.logger.debug(`Saved local file to ${this.localRootDir}`);
+          this.logger.info(`Saved local registry file to ${this.localRootDir}`);
+        } catch (error) {
+          this.logger.error({ error }, `Failed to save local registry file to ${this.localRootDir}`);
+          throw new Error(`Failed to save local registry file: ${error.message}`);
+        }
       }
 
 
@@ -274,7 +283,7 @@ export class AgentRegistry extends BaseRegistry implements IRegistry {
       public async getChains(): Promise<ChainName[]> {
         this.ensureInitialized();
         const chainFolders = await fs.readdir(this.getChainsDir());
-        // Filter out anything that’s not a directory
+        // Filter out anything that's not a directory
         const result: ChainName[] = [];
         for (const folder of chainFolders) {
           const fullPath = path.join(this.getChainsDir(), folder);

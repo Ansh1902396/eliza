@@ -27,11 +27,21 @@ export async function readWarpRouteDeployConfig(
     filePath: string,
     context?: CommandContext,
   ): Promise<WarpRouteDeployConfig> {
-    let config = readYamlOrJson(filePath);
-    if (!config)
-      throw new Error(`No warp route deploy config found at ${filePath}`);
+    try {
+      console.log(`Reading warp route deploy config from ${filePath}`);
+      let config = readYamlOrJson(filePath);
+      if (!config) {
+        throw new Error(`No warp route deploy config found at ${filePath}`);
+      }
 
-    return WarpRouteDeployConfigSchema.parse(config);
+      return WarpRouteDeployConfigSchema.parse(config);
+    } catch (error) {
+      if (error.name === 'ZodError') {
+        console.error('Config validation failed with the following errors:');
+        console.error(JSON.stringify(error.errors, null, 2));
+      }
+      throw new Error(`Failed to read warp route deploy config: ${error.message}`);
+    }
   }
 
 export async function setProxyAdminConfig(
@@ -159,8 +169,16 @@ export function generateTokenConfigs(
       addWarpRouteOptions?: AddWarpRouteOptions,
     ) {
       if (!context.isDryRun) {
-        console.log('Writing deployment artifacts...');
-        await context.registry.addWarpRoute(warpCoreConfig, addWarpRouteOptions);
+        try {
+          console.log('Writing deployment artifacts to registry...');
+          await context.registry.addWarpRoute(warpCoreConfig, addWarpRouteOptions);
+          console.log('✅ Successfully wrote deployment artifacts');
+        } catch (error) {
+          console.error(`Failed to write deployment artifacts: ${error.message}`);
+          throw error;
+        }
+      } else {
+        console.log('Skipping writing deployment artifacts (dry run)');
       }
     }
 

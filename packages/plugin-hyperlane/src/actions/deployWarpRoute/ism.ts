@@ -6,6 +6,7 @@ import { ProxyAdmin__factory } from "@hyperlane-xyz/core";
 import { Address } from "@hyperlane-xyz/utils";
  import { promiseObjAll , objMap } from "@hyperlane-xyz/utils";
  import { WriteCommandContext } from "../core/context";
+import { elizaLogger } from "@elizaos/core";
 
 
   async function createWarpHook({
@@ -29,9 +30,9 @@ import { Address } from "@hyperlane-xyz/utils";
        return hook;
      }
 
-     console.log(`Loading registry factory addresses for ${chain}...`);
+     elizaLogger.log(`Loading registry factory addresses for ${chain}...`);
 
-     console.log(`Creating ${hook.type} Hook for token on ${chain} chain...`);
+     elizaLogger.log(`Creating ${hook.type} Hook for token on ${chain} chain...`);
 
      const {
        mailbox,
@@ -75,7 +76,7 @@ import { Address } from "@hyperlane-xyz/utils";
        contractVerifier,
        proxyFactoryFactories,
      });
-     console.log(`Finished creating ${hook.type} Hook for token on ${chain} chain.`);
+     elizaLogger.log(`Finished creating ${hook.type} Hook for token on ${chain} chain.`);
      const { deployedHook } = evmHookModule.serialize();
      return deployedHook;
    }
@@ -100,7 +101,7 @@ import { Address } from "@hyperlane-xyz/utils";
        !interchainSecurityModule ||
        typeof interchainSecurityModule === 'string'
      ) {
-       console.log(
+       elizaLogger.log(
          `Config Ism is ${
            !interchainSecurityModule ? 'empty' : interchainSecurityModule
          }, skipping deployment.`,
@@ -108,13 +109,13 @@ import { Address } from "@hyperlane-xyz/utils";
        return interchainSecurityModule;
      }
 
-     console.log(`Loading registry factory addresses for ${chain}...`);
+     elizaLogger.log(`Loading registry factory addresses for ${chain}...`);
 
-     console.log(
+     elizaLogger.log(
        `Creating ${interchainSecurityModule.type} ISM for token on ${chain} chain...`,
      );
 
-     console.log(
+     elizaLogger.log(
        `Finished creating ${interchainSecurityModule.type} ISM for token on ${chain} chain.`,
      );
 

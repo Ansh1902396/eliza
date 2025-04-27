@@ -18,6 +18,9 @@ import { GithubRegistry , chainMetadata } from "@hyperlane-xyz/registry";
 import { MultiProvider } from "@hyperlane-xyz/sdk";
 import { WriteCommandContext } from "../core/context";
 import { deployWarpRoutePromptTemplate } from "../../../templates";
+import path from "path";
+import os from "os";
+import fs from "fs";
 
 export const deployWarpRoute:  Action = {
     name : "DEPLOY_WARP_ROUTE",
@@ -79,13 +82,35 @@ export const deployWarpRoute:  Action = {
                                 modelClass: ModelClass.LARGE,
                             });
 
-                            const registry = new GithubRegistry();
+                            // Get GitHub token from settings, or use a fallback for testing
+                            const githubToken = runtime.getSetting("GITHUB_TOKEN") ||
+                                              runtime.getSetting("HYPERLANE_GITHUB_TOKEN");
+
+                            if (!githubToken) {
+                                elizaLogger.error("No GitHub token found in settings");
+                                if (callback) {
+                                    callback({
+                                        text: "Failed to deploy Warp Route: No GitHub token found. Please set GITHUB_TOKEN or HYPERLANE_GITHUB_TOKEN.",
+                                    });
+                                }
+                                return Promise.resolve(false);
+                            }
+
+                            const registry = new GithubRegistry({
+                                authToken: githubToken,
+                            });
 
                             const signerPrivateKey = runtime.getSetting(
                                 "HYPERLANE_PRIVATE_KEY"
                             )as `0x${string}`;
                             if (!signerPrivateKey) {
                                 elizaLogger.error("No signer private key found");
+                                if (callback) {
+                                    callback({
+                                        text: "Failed to deploy Warp Route: No signer private key found.",
+                                    });
+                                }
+                                return Promise.resolve(false);
                             }
 
                             const signer = privateKeyToSigner(signerPrivateKey);
@@ -97,67 +122,143 @@ export const deployWarpRoute:  Action = {
                                 !signerAddress ||
                                 (await signer.getAddress()) !== signerAddress
                             ) {
-                                throw new Error("Signer address not found");
+                                elizaLogger.error("Signer address not found or doesn't match private key");
+                                if (callback) {
+                                    callback({
+                                        text: "Failed to deploy Warp Route: Signer address is invalid or doesn't match the private key.",
+                                    });
+                                }
+                                return Promise.resolve(false);
+                            }
+
+                            // Get chains from settings
+                            const chainsString = runtime.getSetting("HYPERLANE_CHAINS");
+                            const chains = chainsString ? chainsString.split(",") : [];
+
+                            // Check if chains are provided
+                            if (chains.length === 0) {
+                                elizaLogger.error("No chains found for Warp Route deployment");
+                                if (callback) {
+                                    callback({
+                                        text: "Failed to deploy Warp Route: No chains specified. Please set HYPERLANE_CHAINS as a comma-separated list.",
+                                    });
+                                }
+                                return Promise.resolve(false);
+                            }
+
+                            const multiProvider = new MultiProvider(chainMetadata);
+
+                            // Set up signers for all the chains
+                            for (const chain of chains) {
+                                // Only set signer if the chain exists in chainMetadata
+                                if (chainMetadata[chain]) {
+                                    try {
+                                        console.log(`Setting signer for chain: ${chain}`);
+                                        multiProvider.setSigner(chain, signer);
+                                    } catch (error) {
+                                        elizaLogger.error(`Failed to set signer for chain ${chain}: ${error.message}`);
+                                    }
+                                } else {
+                                    elizaLogger.error(`Chain ${chain} not found in chainMetadata`);
+                                }
                             }
 
                             const context: WriteCommandContext = {
-                                            registry: registry,
-                                            multiProvider: new MultiProvider(chainMetadata),
-                                            skipConfirmation: true,
-                                            signerAddress: signerAddress,
-                                            key: signerPrivateKey,
-                                            chainMetadata,
-                                            signer,
-                                        };
+                                registry: registry,
+                                multiProvider: multiProvider,
+                                skipConfirmation: true,
+                                signerAddress: signerAddress,
+                                key: signerPrivateKey,
+                                chainMetadata,
+                                signer,
+                            };
 
-                //TODO  :Add the folder path for the Warp Route deployment
-                const warpDeployer = new WarpDeployerClass(
-                    runtime.getSetting("HYPERLANE_TOKEN_ADDRESS") as string,
-                    runtime.getSetting("HYPERLANE_TOKEN_TYPE") as TokenType,
-                    ""
-                );
-
-                const chains = runtime.getSetting("HYPERLANE_CHAINS") ? runtime.getSetting("HYPERLANE_CHAINS")?.split(",") : [];
-
-                if (!chains) {
-                    elizaLogger.error("No chains found for Warp Route deployment");
-                    throw new Error("No chains found for Warp Route deployment");
+                const tokenAddress = runtime.getSetting("HYPERLANE_TOKEN_ADDRESS") as string;
+                if (!tokenAddress) {
+                    elizaLogger.error("No token address found for Warp Route deployment");
+                    if (callback) {
+                        callback({
+                            text: "Failed to deploy Warp Route: No token address specified. Please set HYPERLANE_TOKEN_ADDRESS.",
+                        });
+                    }
+                    return Promise.resolve(false);
                 }
 
-                //TODO: Add validation if the config is available
-                warpDeployer.createWarpRouteDeployConfig({
-                    context,
-                    chains,
-                })
+                const tokenType = runtime.getSetting("HYPERLANE_TOKEN_TYPE") as TokenType;
+                if (!tokenType) {
+                    elizaLogger.error("No token type found for Warp Route deployment");
+                    if (callback) {
+                        callback({
+                            text: "Failed to deploy Warp Route: No token type specified. Please set HYPERLANE_TOKEN_TYPE.",
+                        });
+                    }
+                    return Promise.resolve(false);
+                }
 
+                // Create directory for config if it doesn't exist
+                const configDir = path.join(os.homedir(), ".hyperlane", "warp");
+                if (!fs.existsSync(configDir)) {
+                    fs.mkdirSync(configDir, { recursive: true });
+                }
+                const configPath = path.join(configDir, "warp-route-deploy-config.yaml");
 
-                warpDeployer.runWarpRouteDeploy({
-                    context : context ,
-                    warpRouteDeployConfigPath : "" //TODO : Add the path for the Warp Route deployment
-                })
+                // Initialize WarpDeployer with proper path
+                const warpDeployer = new WarpDeployerClass(
+                    tokenAddress,
+                    tokenType,
+                    configPath
+                );
 
-                if (callback){
+                elizaLogger.log(`Creating Warp Route config for chains: ${chains.join(', ')}`);
+
+                try {
+                    await warpDeployer.createWarpRouteDeployConfig({
+                        context,
+                        chains,
+                    });
+
+                    elizaLogger.log(`Config created at ${configPath}, starting deployment...`);
+
+                    await warpDeployer.runWarpRouteDeploy({
+                        context: context,
+                        warpRouteDeployConfigPath: configPath
+                    });
+
+                    if (callback) {
+                        callback({
+                            text: "Successfully deployed Warp Route",
+                        });
+                    }
+
+                    return Promise.resolve(true);
+                } catch (error) {
+                    elizaLogger.error(`Error in Warp Route deployment: ${error.message}`);
+                    elizaLogger.error(error.stack);
+
+                    if (callback) {
+                        callback({
+                            text: `Error deploying Warp Route: ${error.message}`,
+                        });
+                    }
+
+                    return Promise.resolve(false);
+                }
+            } catch(error) {
+                elizaLogger.error(
+                    "Error in deploying Warp Route",
+                    error.message
+                );
+                elizaLogger.error(error.stack);
+
+                if (callback) {
                     callback({
-                        text: "Successfully deployed Warp Route",
+                        text: `Error in deploying Warp Route: ${error.message}`,
                     });
                 }
 
-                return Promise.resolve(true);
-            }catch(error){
-                elizaLogger.log(
-                    "Error in deploying Warp Route",
-                    error.message
-                )
-
-                if (callback){
-                    callback({
-                        text : "Error in deploying Warp Route",
-                    })
-                }
-
-                return Promise.resolve(false)
+                return Promise.resolve(false);
             }
-        } ,
+        },
         examples: [
             [
                 {
