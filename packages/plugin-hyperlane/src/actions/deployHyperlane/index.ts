@@ -63,11 +63,9 @@ import {
     createMerkleTreeConfig,
 } from "../core/config";
 
-const registry = new GithubRegistry(
-    {
-        authToken : "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",
-    }
-);
+
+
+
 
 //Initialize the chain congig
 export async function createChainConfig({
@@ -81,7 +79,14 @@ export async function createChainConfig({
     const rpcUrl: any = runtime.getSetting("RPC_URL");
     const isTestnet = runtime.getSetting("IS_TESTNET") === "true";
     const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+    const githubToken = runtime.getSetting("GITHUB_TOKEN") ||
+    runtime.getSetting("HYPERLANE_GITHUB_TOKEN");
 
+    const registry = new GithubRegistry(
+        {
+            authToken : githubToken as string
+        }
+    );
     const metadata: ChainMetadata = {
         name: chainName,
         displayName: chainName,
@@ -154,9 +159,17 @@ async function InitializeDeployment({
 }
 
 //deploy the contracts for the chain
-async function runCoreDeploy(params: HyperlaneDeployParams) {
+async function runCoreDeploy(runtime: IAgentRuntime ,params: HyperlaneDeployParams) {
     const { context, config } = params;
 
+    const githubToken = runtime.getSetting("GITHUB_TOKEN") ||
+    runtime.getSetting("HYPERLANE_GITHUB_TOKEN");
+
+    const registry = new GithubRegistry(
+        {
+            authToken : githubToken as string
+        }
+    );
     let chain = params.chain;
     let apiKeys = await requestAndSaveApiKeys([chain], chainMetadata, registry);
     const multiProvider = context.multiProvider;
@@ -313,12 +326,14 @@ export const setUpAgentOnHyperlane: Action = {
                 modelClass: ModelClass.LARGE,
             });
 
+            const githubToken = runtime.getSetting("GITHUB_TOKEN") ||
+            runtime.getSetting("HYPERLANE_GITHUB_TOKEN");
+
             const registry = new GithubRegistry(
                 {
-                    authToken : "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",
+                    authToken : githubToken as string
                 }
             );
-
             const signerPrivateKey = runtime.getSetting(
                 "HYPERLANE_PRIVATE_KEY"
             );
@@ -364,7 +379,7 @@ export const setUpAgentOnHyperlane: Action = {
                 configFilePath: CORE_CONFIG_FILE,
             });
 
-            await runCoreDeploy({
+            await runCoreDeploy(runtime, {
                 context,
                 config: readYamlOrJson(CORE_CONFIG_FILE),
                 chain: chainName,
