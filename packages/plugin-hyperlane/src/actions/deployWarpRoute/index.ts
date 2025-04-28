@@ -83,17 +83,9 @@ export const deployWarpRoute:  Action = {
                             });
 
                             // Get GitHub token from settings, or use a fallback for testing
-                            const Token =runtime.getSetting("HYPERLANE_TOKEN");
+                            // const Token =runtime.getSetting("HYPERLANE_TOKEN");
 
-                            if (!Token) {
-                                elizaLogger.error("No Token found in settings");
-                                if (callback) {
-                                    callback({
-                                        text: "Failed to deploy Warp Route: No Access Token found. Please set HYPERLANE_TOKEN.",
-                                    });
-                                }
-                                return Promise.resolve(false);
-                            }
+
 
                             const registry = new GithubRegistry({
                                 // authToken: Token,

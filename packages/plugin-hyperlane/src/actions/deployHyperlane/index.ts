@@ -326,7 +326,7 @@ export const setUpAgentOnHyperlane: Action = {
                 modelClass: ModelClass.LARGE,
             });
 
-            const Token =runtime.getSetting("HYPERLANE_TOKEN");
+            // const Token =runtime.getSetting("HYPERLANE_TOKEN");
 
             const registry = new GithubRegistry(
                     // {

@@ -263,7 +263,7 @@ export const transferCrossChainAsset: Action = {
             const sourceSigner = clientToSigner(sourceClient);
             const targetSigner = clientToSigner(targetClient);
 
-            const Token =runtime.getSetting("HYPERLANE_TOKEN");
+            // const Token =runtime.getSetting("HYPERLANE_TOKEN");
 
             const registry = new GithubRegistry(
                 // {
