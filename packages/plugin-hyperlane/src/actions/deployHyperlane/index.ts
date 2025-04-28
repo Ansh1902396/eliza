@@ -326,11 +326,11 @@ export const setUpAgentOnHyperlane: Action = {
                 modelClass: ModelClass.LARGE,
             });
 
-            const githubToken =runtime.getSetting("HYPERLANE_TOKEN");
+            const Token =runtime.getSetting("HYPERLANE_TOKEN");
 
             const registry = new GithubRegistry(
                 {
-                    authToken : githubToken as string
+                    authToken : Token as string
                 }
             );
             const signerPrivateKey = runtime.getSetting(
