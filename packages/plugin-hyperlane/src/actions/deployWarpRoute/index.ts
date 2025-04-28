@@ -83,8 +83,7 @@ export const deployWarpRoute:  Action = {
                             });
 
                             // Get GitHub token from settings, or use a fallback for testing
-                            const githubToken = runtime.getSetting("GITHUB_TOKEN") ||
-                                              runtime.getSetting("HYPERLANE_GITHUB_TOKEN");
+                            const githubToken =runtime.getSetting("HYPERLANE_TOKEN");
 
                             if (!githubToken) {
                                 elizaLogger.error("No GitHub token found in settings");
