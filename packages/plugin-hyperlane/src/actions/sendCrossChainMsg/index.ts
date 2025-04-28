@@ -196,12 +196,12 @@ export const sendCrossChainMessage: Action = {
             const sourceSigner = clientToSigner(sourceClient);
             const targetSigner = clientToSigner(targetClient);
 
-            // const Token = runtime.getSetting("HYPERLANE_TOKEN");
+            const githubToken = runtime.getSetting("HYPERLANE_TOKEN");
 
             const registry = new GithubRegistry(
-                // {
-                //     authToken : Token as string
-                // }
+                {
+                    authToken : githubToken as string
+                }
             );
             const chainMetadata = await registry.getMetadata();
             const multiProvider = new MultiProvider(chainMetadata, {
