@@ -329,9 +329,9 @@ export const setUpAgentOnHyperlane: Action = {
             const Token =runtime.getSetting("HYPERLANE_TOKEN");
 
             const registry = new GithubRegistry(
-                {
-                    authToken : Token as string
-                }
+                    // {
+                    //     authToken : Token as string
+                    // }
             );
             const signerPrivateKey = runtime.getSetting(
                 "HYPERLANE_PRIVATE_KEY"

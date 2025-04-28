@@ -96,7 +96,7 @@ export const deployWarpRoute:  Action = {
                             }
 
                             const registry = new GithubRegistry({
-                                authToken: Token,
+                                // authToken: Token,
                             });
 
                             const signerPrivateKey = runtime.getSetting(
